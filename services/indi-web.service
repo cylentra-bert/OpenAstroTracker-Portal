@@ -1,0 +1,12 @@
+[Unit]
+Description=INDI Web Manager
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/indiweb-venv/bin/indi-web -p 8624 --xmldir /usr/share/indi
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

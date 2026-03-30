@@ -1,0 +1,16 @@
+[Unit]
+Description=x11vnc VNC server for display :0
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Environment=XAUTHORITY=/home/pi/.Xauthority
+Environment=DISPLAY=:0
+ExecStart=/usr/bin/x11vnc -display :0 -nopw -listen localhost -xkb -ncache 10 -ncache_cr -forever
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target
