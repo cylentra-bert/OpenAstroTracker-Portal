@@ -62,10 +62,11 @@ sudo chmod 640 /etc/nginx/.htpasswd-desktop
 # 6. Install systemd services
 echo "[6/8] Installing systemd service units..."
 sudo cp "$REPO_DIR/services/novnc.service" /etc/systemd/system/
-sudo cp "$REPO_DIR/services/indi-web.service" /etc/systemd/system/
-# Generate x11vnc service with the detected desktop user
+# Generate x11vnc and indi-web services with the detected desktop user
 sed "s|User=pi|User=$PORTAL_USER|g; s|/home/pi|$PORTAL_HOME|g" \
     "$REPO_DIR/services/x11vnc.service" | sudo tee /etc/systemd/system/x11vnc.service > /dev/null
+sed "s|User=pi|User=$PORTAL_USER|g" \
+    "$REPO_DIR/services/indi-web.service" | sudo tee /etc/systemd/system/indi-web.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable x11vnc novnc indi-web
 sudo systemctl start x11vnc novnc indi-web

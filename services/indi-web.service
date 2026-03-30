@@ -4,6 +4,7 @@ After=network.target
 
 [Service]
 Type=simple
+User=pi
 ExecStart=/opt/indiweb-venv/bin/indi-web -p 8624 --xmldir /usr/share/indi
 Restart=on-failure
 RestartSec=5
