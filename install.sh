@@ -37,8 +37,17 @@ if [ ! -d "$REPO_DIR/landing" ] || [ -z "$(ls -A "$REPO_DIR/landing")" ]; then
 fi
 sudo cp -r "$REPO_DIR/landing/." "$INSTALL_DIR/landing/"
 
-# 4. Configure nginx
-echo "[4/8] Configuring nginx..."
+# 4. Set up NoVNC access password (must exist before nginx -t references it)
+echo "[4/8] Setting up NoVNC access password..."
+if ! command -v htpasswd &>/dev/null; then
+    sudo apt-get install -y apache2-utils -qq
+fi
+DESKTOP_PASS=$(openssl rand -base64 12 | tr -d "=/+")
+echo "openastrotracker:$(openssl passwd -apr1 "$DESKTOP_PASS")" | sudo tee /etc/nginx/.htpasswd-desktop > /dev/null
+sudo chmod 644 /etc/nginx/.htpasswd-desktop
+
+# 5. Configure nginx
+echo "[5/8] Configuring nginx..."
 sudo cp "$REPO_DIR/nginx/openastrotracker.conf" "$NGINX_SITE"
 if [ -f /etc/nginx/sites-enabled/default ]; then
     sudo rm /etc/nginx/sites-enabled/default
@@ -49,15 +58,6 @@ fi
 sudo nginx -t
 sudo systemctl enable nginx
 sudo systemctl restart nginx
-
-# 5. Set up NoVNC access password
-echo "[5/8] Setting up NoVNC access password..."
-if ! command -v htpasswd &>/dev/null; then
-    sudo apt-get install -y apache2-utils -qq
-fi
-DESKTOP_PASS=$(openssl rand -base64 12 | tr -d "=/+")
-echo "openastrotracker:$(openssl passwd -apr1 "$DESKTOP_PASS")" | sudo tee /etc/nginx/.htpasswd-desktop > /dev/null
-sudo chmod 640 /etc/nginx/.htpasswd-desktop
 
 # 6. Install systemd services
 echo "[6/8] Installing systemd service units..."
