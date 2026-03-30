@@ -14,6 +14,15 @@ if [ -z "$PORTAL_HOME" ]; then
     echo "ERROR: Cannot determine home directory for user '$PORTAL_USER'." >&2
     exit 1
 fi
+# Reject usernames or home paths that would break sed substitution
+if ! printf '%s' "$PORTAL_USER" | grep -qE '^[a-zA-Z0-9._-]+$'; then
+    echo "ERROR: Username '$PORTAL_USER' contains unsupported characters." >&2
+    exit 1
+fi
+if ! printf '%s' "$PORTAL_HOME" | grep -qE '^[a-zA-Z0-9/._-]+$'; then
+    echo "ERROR: Home directory '$PORTAL_HOME' contains unsupported characters." >&2
+    exit 1
+fi
 
 echo "=== OpenAstroTracker Portal Installer ==="
 echo ""
@@ -40,10 +49,26 @@ sudo cp -r "$REPO_DIR/landing/." "$INSTALL_DIR/landing/"
 # 4. Set up NoVNC access password (must exist before nginx -t references it)
 echo "[4/8] Setting up NoVNC access password..."
 if ! command -v htpasswd &>/dev/null; then
-    sudo apt-get install -y apache2-utils -qq
+    echo "  Installing apache2-utils for htpasswd..."
+    sudo apt-get install -y apache2-utils
 fi
 DESKTOP_PASS=$(openssl rand -base64 12 | tr -d "=/+")
-echo "openastrotracker:$(openssl passwd -apr1 "$DESKTOP_PASS")" | sudo tee /etc/nginx/.htpasswd-desktop > /dev/null
+if [ -z "$DESKTOP_PASS" ]; then
+    echo "ERROR: Failed to generate desktop access password." >&2
+    exit 1
+fi
+if [ -f /etc/nginx/.htpasswd-desktop ]; then
+    if ! printf '%s\n' "$DESKTOP_PASS" | sudo htpasswd -i /etc/nginx/.htpasswd-desktop openastrotracker > /dev/null; then
+        echo "ERROR: Failed to update /etc/nginx/.htpasswd-desktop." >&2
+        exit 1
+    fi
+else
+    if ! printf '%s\n' "$DESKTOP_PASS" | sudo htpasswd -i -c /etc/nginx/.htpasswd-desktop openastrotracker > /dev/null; then
+        echo "ERROR: Failed to create /etc/nginx/.htpasswd-desktop." >&2
+        sudo rm -f /etc/nginx/.htpasswd-desktop
+        exit 1
+    fi
+fi
 sudo chmod 644 /etc/nginx/.htpasswd-desktop
 
 # 5. Configure nginx
@@ -63,9 +88,12 @@ sudo systemctl restart nginx
 echo "[6/8] Installing systemd service units..."
 sudo cp "$REPO_DIR/services/novnc.service" /etc/systemd/system/
 # Generate x11vnc and indi-web services with the detected desktop user
-sed "s|User=pi|User=$PORTAL_USER|g; s|/home/pi|$PORTAL_HOME|g" \
+# Escape user/home values so sed replacements are safe against & / \ in the strings
+ESCAPED_USER=$(printf '%s\n' "$PORTAL_USER" | sed 's/[\\&]/\\&/g')
+ESCAPED_HOME=$(printf '%s\n' "$PORTAL_HOME" | sed 's/[\\&]/\\&/g')
+sed "s|User=pi|User=$ESCAPED_USER|g; s|/home/pi|$ESCAPED_HOME|g" \
     "$REPO_DIR/services/x11vnc.service" | sudo tee /etc/systemd/system/x11vnc.service > /dev/null
-sed "s|User=pi|User=$PORTAL_USER|g" \
+sed "s|User=pi|User=$ESCAPED_USER|g" \
     "$REPO_DIR/services/indi-web.service" | sudo tee /etc/systemd/system/indi-web.service > /dev/null
 sudo systemctl daemon-reload
 sudo systemctl enable x11vnc novnc indi-web
