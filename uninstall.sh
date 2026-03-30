@@ -14,7 +14,15 @@ sudo systemctl daemon-reload
 # Remove nginx site
 sudo rm -f /etc/nginx/sites-enabled/openastrotracker
 sudo rm -f /etc/nginx/sites-available/openastrotracker
-sudo systemctl restart nginx
+sudo rm -f /etc/nginx/.htpasswd-desktop
+if [ -f /etc/nginx/sites-available/default ] && [ ! -L /etc/nginx/sites-enabled/default ]; then
+    sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+fi
+if sudo nginx -t 2>/dev/null; then
+    sudo systemctl restart nginx
+else
+    echo "WARNING: nginx configuration invalid after removal. Check /etc/nginx/sites-available/ manually." >&2
+fi
 
 # Remove installed files
 sudo rm -rf /opt/openastrotracker-portal

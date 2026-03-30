@@ -1,9 +1,10 @@
 [Unit]
 Description=NoVNC WebSocket proxy for VNC on :5900
-After=x11vnc.service
+After=network.target x11vnc.service
 Requires=x11vnc.service
 
 [Service]
+User=nobody
 Type=simple
 ExecStart=/usr/share/novnc/utils/launch.sh --listen 6080 --vnc localhost:5900
 Restart=on-failure
