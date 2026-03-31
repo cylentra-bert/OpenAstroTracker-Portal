@@ -46,6 +46,7 @@ Run as your normal desktop user — **not as root**. The script calls `sudo` int
 ```bash
 git clone https://github.com/cylentra-bert/OpenAstroTracker-Portal.git
 cd OpenAstroTracker-Portal
+chmod +x install.sh uninstall.sh   # only needed if git didn't preserve the executable bit
 ./install.sh
 ```
 
