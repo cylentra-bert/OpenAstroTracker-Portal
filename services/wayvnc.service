@@ -8,9 +8,12 @@ Type=simple
 User=pi
 Environment=WAYLAND_DISPLAY=wayland-1
 Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStartPre=/bin/sh -c 'test -e $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY'
 ExecStart=/usr/bin/wayvnc --render-cursor 127.0.0.1 5900
 Restart=on-failure
 RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=60
 
 [Install]
 WantedBy=graphical.target

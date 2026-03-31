@@ -90,16 +90,16 @@ sudo cp "$REPO_DIR/services/novnc.service" /etc/systemd/system/
 # Generate wayvnc and indi-web services with the detected desktop user
 # Escape user/home values so sed replacements are safe against & / \ in the strings
 ESCAPED_USER=$(printf '%s\n' "$PORTAL_USER" | sed 's/[\\&]/\\&/g')
-ESCAPED_HOME=$(printf '%s\n' "$PORTAL_HOME" | sed 's/[\\&]/\\&/g')
-PORTAL_UID=$(id -u "$PORTAL_USER")
+PORTAL_UID=$(id -u "$PORTAL_USER") || { echo "ERROR: Cannot determine UID for user '$PORTAL_USER'." >&2; exit 1; }
 sed "s|User=pi|User=$ESCAPED_USER|g; s|/run/user/1000|/run/user/$PORTAL_UID|g" \
     "$REPO_DIR/services/wayvnc.service" | sudo tee /etc/systemd/system/wayvnc.service > /dev/null
 sed "s|User=pi|User=$ESCAPED_USER|g" \
     "$REPO_DIR/services/indi-web.service" | sudo tee /etc/systemd/system/indi-web.service > /dev/null
 # Remove old x11vnc service if present
-if systemctl is-enabled --quiet x11vnc 2>/dev/null; then
-    sudo systemctl stop x11vnc
-    sudo systemctl disable x11vnc
+if systemctl is-active --quiet x11vnc 2>/dev/null || systemctl is-enabled --quiet x11vnc 2>/dev/null; then
+    sudo systemctl stop x11vnc 2>/dev/null || true
+    sudo systemctl disable x11vnc 2>/dev/null || true
+    sudo rm -f /etc/systemd/system/x11vnc.service
 fi
 sudo systemctl daemon-reload
 sudo systemctl enable wayvnc novnc indi-web
