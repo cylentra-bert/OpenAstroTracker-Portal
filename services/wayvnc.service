@@ -1,0 +1,16 @@
+[Unit]
+Description=WayVNC server for Wayland desktop
+After=graphical.target
+Wants=graphical.target
+
+[Service]
+Type=simple
+User=pi
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+ExecStart=/usr/bin/wayvnc --render-cursor 127.0.0.1 5900
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target

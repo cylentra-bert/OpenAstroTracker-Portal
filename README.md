@@ -7,9 +7,9 @@ A single-script installer that sets up a unified web portal on a Raspberry Pi fo
 | Path | Tool | Requires |
 |------|------|----------|
 | `/` | Landing page | nginx running |
+| `/indi/` | INDI Web Manager device control | indi-web service running |
 | `/pa/` | Polar alignment tool | oat-web-pa running on port 5000 |
 | `/desktop/` | Remote desktop (KStars / PHD2) | Active graphical session; password-protected |
-| `/indi/` | INDI Web Manager device control | indi-web service running |
 
 ---
 
@@ -33,7 +33,21 @@ The portal is accessed at `http://openastrotracker.local`. For this hostname to 
 sudo hostnamectl set-hostname openastrotracker
 ```
 
-A reboot is not required, but avahi-daemon must be (re)started after the change:
+Then update `/etc/hosts` so the system can resolve its own hostname. Open the file:
+
+```bash
+sudo nano /etc/hosts
+```
+
+Find the line with the old hostname (e.g. `raspberrypi`) and change it to `openastrotracker`:
+
+```
+127.0.1.1       openastrotracker
+```
+
+Save and exit. Without this step, `sudo` will print "unable to resolve host" warnings on every command.
+
+Finally, restart avahi-daemon so the `.local` name is advertised:
 
 ```bash
 sudo systemctl restart avahi-daemon
@@ -56,12 +70,12 @@ At the end of the install, a randomly generated password for `/desktop/` is prin
 
 ### What the installer does
 
-1. Installs packages: `nginx`, `novnc`, `x11vnc`, `pipx`, `python3-venv`, `avahi-daemon`
+1. Installs packages: `nginx`, `novnc`, `wayvnc`, `pipx`, `python3-venv`, `avahi-daemon`
 2. Creates a Python virtual environment at `/opt/indiweb-venv/` and installs `indiweb`
 3. Copies the landing page to `/opt/openastrotracker-portal/landing/`
 4. Generates a random password and creates `/etc/nginx/.htpasswd-desktop` to protect `/desktop/`
 5. Installs and enables the nginx site config; removes the default nginx site
-6. Installs, enables, and starts three systemd services: `novnc`, `x11vnc`, `indi-web`
+6. Installs, enables, and starts three systemd services: `wayvnc`, `novnc`, `indi-web`
 7. Enables `avahi-daemon` for `.local` hostname resolution
 
 ---
@@ -73,7 +87,7 @@ Open `http://openastrotracker.local` in a browser on the same network.
 If that doesn't resolve, find the Pi's IP address with `hostname -I` on the Pi and use `http://<ip-address>` instead.
 
 - `/pa/` requires `oat-web-pa` to be running separately. The portal does not start it.
-- `/desktop/` requires an active graphical desktop session on the Pi and KStars to be open.
+- `/desktop/` requires an active graphical desktop session on the Pi. Use the remote desktop to open KStars, PHD2, and other tools.
 
 ---
 
@@ -93,18 +107,18 @@ sudo ufw allow 80/tcp
 
 | Service | Description | Port |
 |---------|-------------|------|
-| `x11vnc` | Exports the graphical desktop on display `:0` via VNC | 5900 |
+| `wayvnc` | Exports the Wayland desktop via VNC | 5900 |
 | `novnc` | WebSocket proxy that bridges VNC to HTTP | 6080 |
 | `indi-web` | INDI Web Manager | 8624 |
 
-`novnc` depends on `x11vnc` — if x11vnc is not running, novnc will also be down.
+`novnc` depends on `wayvnc` — if wayvnc is not running, novnc will also be down.
 
-`x11vnc` will enter a restart loop when no graphical session is active. This is normal — it retries every 5 seconds and starts working once someone logs in to the Pi's desktop.
+`wayvnc` will enter a restart loop when no graphical session is active. This is normal — it retries every 5 seconds and starts working once someone logs in to the Pi's desktop.
 
 Check service status:
 
 ```bash
-sudo systemctl status novnc x11vnc indi-web
+sudo systemctl status wayvnc novnc indi-web
 ```
 
 ---
@@ -131,7 +145,7 @@ Re-running the installer is safe. It updates packages, overwrites the nginx conf
 Stops and disables all three services, removes the nginx site, removes `/opt/openastrotracker-portal/` and `/opt/indiweb-venv/`, and re-enables the default nginx site if available. Packages installed via apt (`nginx`, `novnc`, `x11vnc`, etc.) are not removed — uninstall them manually if needed:
 
 ```bash
-sudo apt remove nginx novnc x11vnc avahi-daemon apache2-utils
+sudo apt remove nginx novnc wayvnc avahi-daemon apache2-utils
 ```
 
 ---
@@ -139,7 +153,7 @@ sudo apt remove nginx novnc x11vnc avahi-daemon apache2-utils
 ## Pitfalls
 
 **Do not run as root.**
-The installer detects the desktop user via `$SUDO_USER`. Running as root directly (e.g. `sudo su` then `./install.sh`) causes `$SUDO_USER` to be empty, which results in incorrect service files and `x11vnc`/`indi-web` failing at startup.
+The installer detects the desktop user via `$SUDO_USER`. Running as root directly (e.g. `sudo su` then `./install.sh`) causes `$SUDO_USER` to be empty, which results in incorrect service files and `wayvnc`/`indi-web` failing at startup.
 
 **`openastrotracker.local` won't work until the hostname is set.**
 avahi-daemon publishes the Pi's system hostname. The default Raspberry Pi OS hostname is `raspberrypi`, not `openastrotracker`. See [Installation step 1](#1-set-the-pis-hostname).
@@ -151,7 +165,7 @@ avahi-daemon publishes the Pi's system hostname. The default Raspberry Pi OS hos
 The portal proxies `/pa/` to port 5000 but does not manage the oat-web-pa process.
 
 **`/desktop/` requires a graphical session on the Pi.**
-"Graphical session" means a user is logged in to the Pi's desktop environment on the physical display (or a virtual framebuffer). SSH sessions do not count. `x11vnc` attaches to display `:0`.
+"Graphical session" means a user is logged in to the Pi's desktop environment. SSH sessions do not count. `wayvnc` attaches to the active Wayland session.
 
 ---
 
@@ -178,13 +192,13 @@ sudo systemctl status oat-web-pa
 
 **502 Bad Gateway on `/desktop/`**
 
-Check both services — novnc depends on x11vnc:
+Check both services — novnc depends on wayvnc:
 
 ```bash
-sudo systemctl status novnc x11vnc
+sudo systemctl status wayvnc novnc
 ```
 
-If x11vnc shows a restart loop, log in to the Pi's desktop graphically and it will stabilize.
+If wayvnc shows a restart loop, log in to the Pi's desktop graphically and it will stabilize.
 
 **`/desktop/` login fails**
 

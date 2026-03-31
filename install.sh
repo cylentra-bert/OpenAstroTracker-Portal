@@ -30,12 +30,12 @@ echo ""
 # 1. Install packages
 echo "[1/8] Installing packages..."
 sudo apt-get update -qq
-sudo apt-get install -y nginx novnc x11vnc pipx python3-venv avahi-daemon
+sudo apt-get install -y nginx novnc wayvnc pipx python3-venv avahi-daemon
 
 # 2. Install INDI Web Manager into a dedicated venv (path used by indi-web.service)
 echo "[2/8] Installing INDI Web Manager..."
 sudo python3 -m venv "$INDIWEB_VENV"
-sudo "$INDIWEB_VENV/bin/pip" install indiweb
+sudo "$INDIWEB_VENV/bin/pip" install indiweb legacy-cgi
 
 # 3. Copy landing page
 echo "[3/8] Installing landing page..."
@@ -87,28 +87,33 @@ sudo systemctl restart nginx
 # 6. Install systemd services
 echo "[6/8] Installing systemd service units..."
 sudo cp "$REPO_DIR/services/novnc.service" /etc/systemd/system/
-# Generate x11vnc and indi-web services with the detected desktop user
+# Generate wayvnc and indi-web services with the detected desktop user
 # Escape user/home values so sed replacements are safe against & / \ in the strings
 ESCAPED_USER=$(printf '%s\n' "$PORTAL_USER" | sed 's/[\\&]/\\&/g')
 ESCAPED_HOME=$(printf '%s\n' "$PORTAL_HOME" | sed 's/[\\&]/\\&/g')
-sed "s|User=pi|User=$ESCAPED_USER|g; s|/home/pi|$ESCAPED_HOME|g" \
-    "$REPO_DIR/services/x11vnc.service" | sudo tee /etc/systemd/system/x11vnc.service > /dev/null
+PORTAL_UID=$(id -u "$PORTAL_USER")
+sed "s|User=pi|User=$ESCAPED_USER|g; s|/run/user/1000|/run/user/$PORTAL_UID|g" \
+    "$REPO_DIR/services/wayvnc.service" | sudo tee /etc/systemd/system/wayvnc.service > /dev/null
 sed "s|User=pi|User=$ESCAPED_USER|g" \
     "$REPO_DIR/services/indi-web.service" | sudo tee /etc/systemd/system/indi-web.service > /dev/null
+# Remove old x11vnc service if present
+if systemctl is-enabled --quiet x11vnc 2>/dev/null; then
+    sudo systemctl stop x11vnc
+    sudo systemctl disable x11vnc
+fi
 sudo systemctl daemon-reload
-sudo systemctl enable x11vnc novnc indi-web
-sudo systemctl start x11vnc novnc indi-web
+sudo systemctl enable wayvnc novnc indi-web
+sudo systemctl start wayvnc novnc indi-web
 
 echo ""
 echo "Checking service status..."
-for svc in novnc indi-web; do
+for svc in wayvnc novnc indi-web; do
     if sudo systemctl is-active --quiet "$svc"; then
         echo "  ✓ $svc running"
     else
         echo "  ✗ $svc failed to start — check: sudo systemctl status $svc"
     fi
 done
-echo "  ℹ x11vnc requires an active desktop session (starts when you log in graphically)"
 
 # 7. Enable avahi for .local hostname resolution
 echo "[7/8] Enabling mDNS (avahi)..."
@@ -130,4 +135,4 @@ echo "Username: openastrotracker"
 echo "Store this password somewhere safe — it cannot be recovered after install."
 echo ""
 echo "Note: oat-web-pa must be running for /pa/ to respond."
-echo "Note: Start KStars before using /desktop/."
+echo "Note: /desktop/ shows the Pi's graphical desktop — use it to open KStars, PHD2, etc."
