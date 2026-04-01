@@ -1,7 +1,7 @@
 [Unit]
 Description=NoVNC WebSocket proxy for VNC on :5900
 After=network.target wayvnc.service
-Requires=wayvnc.service
+Wants=wayvnc.service
 
 [Service]
 User=nobody

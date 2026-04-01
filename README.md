@@ -18,6 +18,8 @@ A single-script installer that sets up a unified web portal on a Raspberry Pi fo
 Before running the installer, the following must already be set up on the Raspberry Pi:
 
 - **Raspberry Pi OS with Desktop** — 64-bit, Bookworm or later. The Lite (headless) image does not include a graphical environment and the remote desktop feature will not work.
+- **Desktop auto-login enabled** — the remote desktop requires an active graphical session. Without auto-login, the Pi boots to the login screen and wayvnc cannot connect. Enable with: `sudo raspi-config nonint do_boot_behaviour B4`
+- **Screen blanking disabled** — prevents the desktop session from being killed when no monitor is attached. Disable with: `sudo raspi-config nonint do_blanking 1`
 - **[astro-soft-build](https://gitea.nouspiro.space/nou/astro-soft-build)** — provides INDI, KStars, and PHD2
 - **[oat-web-pa](https://github.com/af7v/OpenAstroTracker-PA)** — provides the polar alignment tool on port 5000
 
